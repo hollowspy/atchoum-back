@@ -10,7 +10,7 @@ var indexRouter = require('./routes/index');
 
 
 
-const whitelist = ["http://localhost:3000", 'https://concours-atchoum.netlify.app/']
+const whitelist = ["http://localhost:3000", 'https://concours-atchoum.netlify.app']
 const corsOptions = {
   //origin: '*',
   origin: function (origin, callback) {
