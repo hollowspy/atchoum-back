@@ -1,17 +1,11 @@
-const { Client } = require('pg')
+const { Client } = require('pg');
+require('dotenv').config();
 
-// const client = new Client({
-//     user: 'postgres',
-//     host: 'localhost',
-//     database: 'unkle',
-//     password: 'Jn8bb11',
-//     port: 5432,
-// })
 const client = new Client({
-  user: 'mpvxxzim',
-  host: 'horton.db.elephantsql.com',
-  database: 'mpvxxzim',
-  password: 'y1XjDLOOS2_X0hNONWO7Ik7MUzBDAhFZ',
+  user: process.env.DATABASE_USER,
+  host:  process.env.DATABASE_HOST,
+  database: process.env.DATABASE_DBNAME,
+  password: process.env.DATABASE_PASSWORD,
   port: 5432,
 })
 client.connect(function(err) {

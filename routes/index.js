@@ -3,7 +3,8 @@ var router = express.Router();
 const pg = require('../bdd/bdd');
 const nodemailer = require('nodemailer');
 const hbs = require('nodemailer-express-handlebars');
-const path = require('path')
+const path = require('path');
+require('dotenv').config();
 
 
 
@@ -31,8 +32,8 @@ router.post('/', async (req, res, next) => {
         {
             service: 'gmail',
             auth:{
-                user: 'atchoum.niedzwiecki@gmail.com',
-                pass: 'xvrhlrffmasdzqmy'
+                user: process.env.MAIL_USER,
+                pass: process.env.MAIL_PASSWORD,
             }
         }
     );

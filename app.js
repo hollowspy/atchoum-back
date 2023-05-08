@@ -10,19 +10,19 @@ var indexRouter = require('./routes/index');
 
 
 
-const whitelist = ["https://localhost:3000", 'https://concours-atchoum.netlify.app/']
+const whitelist = ["http://localhost:3000", 'https://concours-atchoum.netlify.app/']
 const corsOptions = {
-  origin: '*',
-  // origin: function (origin, callback) {
-  //   if (!origin || whitelist.indexOf(origin) !== -1) {
-  //     callback(null, true)
-  //   } else {
-  //     callback(new Error("Not allowed by CORS"))
-  //   }
-  // },
+  //origin: '*',
+  origin: function (origin, callback) {
+     if (!origin || whitelist.indexOf(origin) !== -1) {
+       callback(null, true)
+     } else {
+       callback(new Error("Not allowed by CORS"))
+     }
+   },
   credentials: true,
 }
-app.use(cors())
+app.use(cors(corsOptions))
 
 
 
