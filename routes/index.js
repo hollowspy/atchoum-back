@@ -24,7 +24,7 @@ router.post('/', async (req, res, next) => {
         error.status = 400;
         return next(error);
     }
-    return res.status(202).send({
+    res.status(202).send({
         success: true
     });
     const transporter = nodemailer.createTransport(
