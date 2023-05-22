@@ -7,7 +7,7 @@ const path = require('path');
 require('dotenv').config();
 
 
-router.get('healthz', (req, res, next) => {
+router.get('/healthz', (req, res, next) => {s
     return res.status(200).send('OK')
 })
 
