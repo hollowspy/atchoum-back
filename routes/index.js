@@ -7,6 +7,9 @@ const path = require('path');
 require('dotenv').config();
 
 
+router.get('healthz', (req, res, next) => {
+    return res.status(200).send('OK')
+})
 
 router.post('/', async (req, res, next) => {
     const user = {...req.body};
