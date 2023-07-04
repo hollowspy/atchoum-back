@@ -4,10 +4,11 @@ const pg = require('../bdd/bdd');
 const nodemailer = require('nodemailer');
 const hbs = require('nodemailer-express-handlebars');
 const path = require('path');
+const axios = require('axios');
 require('dotenv').config();
 
 
-router.get('/healthz', (req, res, next) => {s
+router.get('/healthz', (req, res, next) => {
     return res.status(200).send('OK')
 })
 
@@ -81,7 +82,6 @@ router.post('/', async (req, res, next) => {
 
 router.post('/result', async(req, res, next) => {
     const user = {...req.body};
-    console.log('user', user);
     if (user.email == '' || user.email === null) {
         const error = new Error('body is empty or null');
         return next(error);
@@ -109,6 +109,24 @@ router.post('/results', async(req, res, next) => {
     res.status(202).send({
         result: resultAllUsers.rows
     });
+})
+
+router.post('/see_results', async (req, res, next) => {
+    const { id } = req.body;
+    const decisionAPI = await axios.post('https://decision.flagship.io/v2/ci84rm4uf6t1jrrefeig/campaigns', {
+        visitor_id: id,
+        context: {},
+        visitor_consent: true,
+        trigger_hit: true,
+        decision_group: null
+    }, {
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': 'HplFmExQUmlCmSYVSXDWCtfgimmBJeqCfBwOvfCp'
+        }
+    });
+    const flagWithValue = decisionAPI.data.campaigns[0].variation.modifications.value;
+    return res.status(200).send(flagWithValue);
 })
 
 module.exports = router;
