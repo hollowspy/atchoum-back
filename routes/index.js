@@ -79,4 +79,36 @@ router.post('/', async (req, res, next) => {
     }
 })
 
+router.post('/result', async(req, res, next) => {
+    const user = {...req.body};
+    console.log('user', user);
+    if (user.email == '' || user.email === null) {
+        const error = new Error('body is empty or null');
+        return next(error);
+    }
+    const queryResultByUser = `SELECT * FROM users WHERE email = '${user.email}'`;
+    const resultByUser = await pg.query(queryResultByUser);
+    if (!resultByUser.rows.length) {
+        const error = new Error('No user found with this email');
+        error.status = 400;
+        return next(error);
+    }
+    res.status(202).send({
+        result: resultByUser.rows[0]
+    });
+})
+
+router.post('/results', async(req, res, next) => {
+   const queryAllResults = `SELECT * FROM users`;
+    const resultAllUsers = await pg.query(queryAllResults);
+    if (!resultAllUsers.rows.length) {
+        const error = new Error('No results fond');
+        error.status = 400;
+        return next(error);
+    }
+    res.status(202).send({
+        result: resultAllUsers.rows
+    });
+})
+
 module.exports = router;
