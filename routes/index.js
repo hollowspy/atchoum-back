@@ -5,6 +5,7 @@ const nodemailer = require('nodemailer');
 const hbs = require('nodemailer-express-handlebars');
 const path = require('path');
 const axios = require('axios');
+const findResult = require("../controllers/findResults");
 require('dotenv').config();
 
 
@@ -80,53 +81,82 @@ router.post('/', async (req, res, next) => {
     }
 })
 
-router.post('/result', async(req, res, next) => {
-    const user = {...req.body};
-    if (user.email == '' || user.email === null) {
+
+router.post('/result', async (req, res, next) => {
+    const user = { ...req.body };
+
+    if (!user.email || user.email.trim() === '') {
         const error = new Error('body is empty or null');
-        return next(error);
-    }
-    const queryResultByUser = `SELECT * FROM users WHERE email = '${user.email}'`;
-    const resultByUser = await pg.query(queryResultByUser);
-    if (!resultByUser.rows.length) {
-        const error = new Error('No user found with this email');
         error.status = 400;
         return next(error);
     }
-    res.status(202).send({
-        result: resultByUser.rows[0]
-    });
+
+    try {
+        // Requête sécurisée avec variable injectée
+        const resultByUser = await pg`
+      SELECT * FROM users WHERE email = ${user.email}
+    `;
+
+        if (!resultByUser.length) {
+            const error = new Error('No user found with this email');
+            error.status = 400;
+            return next(error);
+        }
+
+        res.status(202).send({
+            result: resultByUser[0], // Pas de `.rows[0]`, car pg renvoie déjà un tableau JS
+        });
+    } catch (err) {
+        console.error('Erreur dans /result :', err);
+        next(err);
+    }
 })
 
-router.post('/results', async(req, res, next) => {
-   const queryAllResults = `SELECT * FROM users`;
-    const resultAllUsers = await pg.query(queryAllResults);
-    if (!resultAllUsers.rows.length) {
-        const error = new Error('No results fond');
-        error.status = 400;
-        return next(error);
+router.post('/results', async (req, res, next) => {
+    try {
+        const resultAllUsers = await pg`SELECT * FROM users`;
+
+        if (!resultAllUsers.length) {
+            const error = new Error('No results found');
+            error.status = 400;
+            return next(error);
+        }
+
+        res.status(202).send({
+            result: resultAllUsers, // direct, c'est un tableau JS
+        });
+    } catch (err) {
+        console.error('Erreur dans /results :', err);
+        next(err);
     }
-    res.status(202).send({
-        result: resultAllUsers.rows
-    });
-})
+});
 
 router.post('/see_results', async (req, res, next) => {
-    const { id } = req.body;
-    const decisionAPI = await axios.post('https://decision.flagship.io/v2/ci84rm4uf6t1jrrefeig/campaigns', {
-        visitor_id: id,
-        context: {},
-        visitor_consent: true,
-        trigger_hit: true,
-        decision_group: null
-    }, {
-        headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': 'HplFmExQUmlCmSYVSXDWCtfgimmBJeqCfBwOvfCp'
-        }
-    });
-    const flagWithValue = decisionAPI.data.campaigns[0].variation.modifications.value;
-    return res.status(200).send(flagWithValue);
+    try {
+        const { id } = req.body;
+        const decisionAPI = await axios.post('https://decision.flagship.io/v2/ci84rm4uf6t1jrrefeig/campaigns', {
+            visitor_id: id.toString(),
+            context: {},
+            visitor_consent: true,
+            trigger_hit: true,
+            decision_group: null
+        }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': 'HplFmExQUmlCmSYVSXDWCtfgimmBJeqCfBwOvfCp'
+            }
+        });
+        console.log('décision API', decisionAPI.data.campaigns);
+        const flagWithValue = decisionAPI.data.campaigns[0].variation.modifications.value;
+        return res.status(200).send(flagWithValue);
+    } catch (e) {
+        console.log('e', e);
+        return res.status(400).send(e)
+    }
+
 })
+
+
+router.get('/findResult', findResult)
 
 module.exports = router;

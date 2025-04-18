@@ -1,3 +1,14 @@
+const postgres = require('postgres');
+require('dotenv').config();
+
+const connectionString = process.env.DATABASE_URL;
+
+// Création de la connexion avec Supabase
+const sql = postgres(connectionString);
+
+module.exports = sql;
+
+/*
 const { Client } = require('pg');
 require('dotenv').config();
 
@@ -14,3 +25,5 @@ client.connect(function(err) {
 });
 
 module.exports = client;
+ */
+
