@@ -134,6 +134,7 @@ router.post('/results', async (req, res, next) => {
 router.post('/see_results', async (req, res, next) => {
     try {
         const { id } = req.body;
+        console.log('id', id)
         const decisionAPI = await axios.post('https://decision.flagship.io/v2/ci84rm4uf6t1jrrefeig/campaigns', {
             visitor_id: id.toString(),
             context: {},
@@ -146,7 +147,10 @@ router.post('/see_results', async (req, res, next) => {
                 'x-api-key': 'HplFmExQUmlCmSYVSXDWCtfgimmBJeqCfBwOvfCp'
             }
         });
-        console.log('décision API', decisionAPI.data.campaigns);
+        console.log('décision API', decisionAPI.data.campaigns[0]);
+        if (!decisionAPI.data.campaigns.length) {
+            return res.status(200).send({has_access_results_atchoum:false})
+        }
         const flagWithValue = decisionAPI.data.campaigns[0].variation.modifications.value;
         return res.status(200).send(flagWithValue);
     } catch (e) {
