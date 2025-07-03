@@ -147,7 +147,6 @@ router.post('/see_results', async (req, res, next) => {
                 'x-api-key': 'HplFmExQUmlCmSYVSXDWCtfgimmBJeqCfBwOvfCp'
             }
         });
-        console.log('décision API', decisionAPI.data.campaigns[0]);
         if (!decisionAPI.data.campaigns.length) {
             return res.status(200).send({has_access_results_atchoum:false})
         }
@@ -162,5 +161,145 @@ router.post('/see_results', async (req, res, next) => {
 
 
 router.get('/findResult', findResult)
+
+
+router.get('/products_contentfull', async (req, res, next) => {
+     const parseDataFromContentful = (response) => {
+        const assetMap = new Map();
+
+        // Construire une map des assets (id → URL)
+        response.includes?.Asset?.forEach((asset) => {
+            const assetId = asset.sys.id;
+            const url = asset.fields.file.url.startsWith('//')
+                ? 'https:' + asset.fields.file.url
+                : asset.fields.file.url;
+            assetMap.set(assetId, url);
+        });
+
+        // Transformer les items en format simplifié
+        return response.items.map((entry) => {
+            const imgId = entry.fields.img?.sys?.id;
+            const imageUrl = assetMap.get(imgId) ?? '';
+
+            return {
+                id: entry.sys.id,
+                name: entry.fields.name,
+                brand: entry.fields.brand,
+                size: entry.fields.size,
+                color: entry.fields.color,
+                imageUrl,
+            };
+        });
+    }
+
+    async function getVariationIdForCampaign(visitorId, targetCampaignId) {
+         const response = await axios.post(
+                'https://decision.flagship.io/v2/ci84rm4uf6t1jrrefeig/campaigns',
+                {
+                    visitor_id: visitorId,
+                    context: {},
+                    visitor_consent: true,
+                    trigger_hit: true,
+                    decision_group: null
+                },
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': 'HplFmExQUmlCmSYVSXDWCtfgimmBJeqCfBwOvfCp'
+                    }
+                }
+            );
+
+            const campaigns = response.data.campaigns;
+
+            const campaign = campaigns.find(c => c.id === targetCampaignId);
+
+            if (!campaign) {
+               return false;
+            }
+
+            const variationId = campaign.variation.id;
+
+            return variationId;
+    }
+
+    async function getContentFromFlagshipVariation(variationIdFlagship) {
+            // Appel Contentful pour le container
+            const contentfulResponse = await axios.get(
+                'https://cdn.contentful.com/spaces/st53zti66d9u/environments/master/entries',
+                {
+                    params: {
+                        content_type: 'variationContainer',
+                        access_token: 'POgvWhYCAz-KkV9SLtzZK9W6ge3KKw7Lcxl7vQt11Lc',
+                        'fields.experimentKey': 'products_page'
+                    }
+                }
+            );
+            if (!contentfulResponse.data) {
+                throw new Error('no data find in variation container')
+            }
+            const items = contentfulResponse.data.items;
+            const includes = contentfulResponse.data.includes;
+
+            if (!items.length) {
+                throw new Error('Aucun container trouvé.');
+            }
+
+            const container = items[0];
+            const meta = container.fields.meta;
+
+            // Cherche l'ID de la variation Contentful correspondant à l’ID Flagship
+            const variationContentfulId = meta[variationIdFlagship];
+            if (!variationContentfulId) {
+                throw new Error(`Aucune correspondance trouvée dans le meta pour l’ID Flagship ${variationIdFlagship}`);
+            }
+
+            // Trouve l'entrée Contentful (pull ou tshirt)
+            const entry = includes.Entry.find(e => e.sys.id === variationContentfulId);
+            if (!entry) {
+                throw new Error(`Aucune entrée trouvée pour l’ID Contentful ${variationContentfulId}`);
+            }
+
+            // Récupération de l'image associée
+            const assetId = entry.fields.img.sys.id;
+            const asset = includes.Asset.find(a => a.sys.id === assetId);
+            const imageUrl = asset?.fields?.file?.url
+                ? `https:${asset.fields.file.url}`
+                : null;
+
+            // Formatage final
+            const formatted = {
+                name: entry.fields.name,
+                brand: entry.fields.brand,
+                size: entry.fields.size,
+                color: entry.fields.color,
+                imageUrl
+            };
+            console.log('formatted', formatted)
+
+            return formatted;
+    }
+
+
+    try {
+        const visitorId = Date.now() + '-' + Math.floor(Math.random() * 10000);
+        const idOrigninal = 'd1ilgv373e5iv8esho90';
+        const varationFS = await getVariationIdForCampaign(visitorId, "d1ilgv373e5iv8esho80");
+        if (!varationFS || (varationFS === idOrigninal)) {
+            const urlContentFull = 'https://cdn.contentful.com/spaces/st53zti66d9u/environments/master/entries?access_token=POgvWhYCAz-KkV9SLtzZK9W6ge3KKw7Lcxl7vQt11Lc';
+            const response = await axios.get(urlContentFull)
+            const formattedRes = parseDataFromContentful(response.data);
+            return res.send(formattedRes.filter((res) => res.name))
+        }
+        const formattedRes = await getContentFromFlagshipVariation(varationFS);
+        return res.send([formattedRes])
+
+    } catch (e) {
+        return res.status(500).send({
+            message: 'Error at get contentfull',
+            error: e.message, // ou juste e si tu veux tout
+        });
+    }
+})
 
 module.exports = router;
