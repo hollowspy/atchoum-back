@@ -8,6 +8,47 @@ const axios = require('axios');
 const findResult = require("../controllers/findResults");
 require('dotenv').config();
 
+const { Flagship, DecisionMode } = require('@flagship.io/js-sdk');
+
+Flagship.start(
+    'ci84rm4uf6t1jrrefeig',
+    'HplFmExQUmlCmSYVSXDWCtfgimmBJeqCfBwOvfCp',
+)
+
+async function decideFlag({ visitorId, flagKey, context = {}, defaultValue = null }) {
+      const visitor = Flagship.newVisitor({
+          visitorId,
+          context,
+          hasConsented: true }
+      );
+
+    console.log(visitor);
+
+      await visitor.fetchFlags();
+      const flag = visitor.getFlag(flagKey);
+      const value = flag.getValue(defaultValue);
+      const meta = flag.metadata;
+
+      return { value, meta };
+}
+
+const visitor = Flagship.newVisitor({
+    visitorId: "100000",
+    context: {}, // Ajoute ici tes clés de contexte si besoin
+    consent: true // correspond à "visitor_consent": true
+});
+
+// Appel à la Decision API pour récupérer les flags du visiteur
+visitor.fetchFlags().then(() => {
+    // Récupération de la valeur du flag "has_access_results_atchoum"
+    const myFlag = visitor.getFlag("has_access_results_atchoum");
+    const flagValue = myFlag.getValue();
+    console.log("Valeur du flag has_access_results_atchoum :", flagValue);
+
+    // Si tu veux parcourir tous les flags :
+    /*const allFlags = visitor.getAllFlagsData();
+    console.log("Tous les flags :", allFlags);*/
+});
 
 router.get('/healthz', (req, res, next) => {
     return res.status(200).send('OK')
@@ -135,7 +176,15 @@ router.post('/see_results', async (req, res, next) => {
     try {
         const { id } = req.body;
         console.log('id', id)
-        const decisionAPI = await axios.post('https://decision.flagship.io/v2/ci84rm4uf6t1jrrefeig/campaigns', {
+        const FLAG_KEY = 'has_access_results_atchoum';
+        const { value } = await decideFlag({
+          visitorId: String(id),
+          flagKey: FLAG_KEY,
+          defaultValue: false,
+        });
+
+        return res.status(200).send({ [FLAG_KEY]: Boolean(value) });
+        /*const decisionAPI = await axios.post('https://decision.flagship.io/v2/ci84rm4uf6t1jrrefeig/campaigns', {
             visitor_id: id.toString(),
             context: {},
             visitor_consent: true,
@@ -151,7 +200,7 @@ router.post('/see_results', async (req, res, next) => {
             return res.status(200).send({has_access_results_atchoum:false})
         }
         const flagWithValue = decisionAPI.data.campaigns[0].variation.modifications.value;
-        return res.status(200).send(flagWithValue);
+        return res.status(200).send(flagWithValue);*/
     } catch (e) {
         console.log('e', e);
         return res.status(400).send(e)
