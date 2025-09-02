@@ -4,51 +4,27 @@ const pg = require('../bdd/bdd');
 const nodemailer = require('nodemailer');
 const hbs = require('nodemailer-express-handlebars');
 const path = require('path');
-const axios = require('axios');
 const findResult = require("../controllers/findResults");
 require('dotenv').config();
 
-const { Flagship, DecisionMode } = require('@flagship.io/js-sdk');
+var contentful = require('contentful')
+
+const { Flagship, DecisionMode} = require('@flagship.io/js-sdk');
 
 Flagship.start(
     'ci84rm4uf6t1jrrefeig',
     'HplFmExQUmlCmSYVSXDWCtfgimmBJeqCfBwOvfCp',
+    {
+        decisionMode: DecisionMode.DECISION_API,
+        fetchNow: false
+    }
 )
 
-async function decideFlag({ visitorId, flagKey, context = {}, defaultValue = null }) {
-      const visitor = Flagship.newVisitor({
-          visitorId,
-          context,
-          hasConsented: true }
-      );
-
-    console.log(visitor);
-
-      await visitor.fetchFlags();
-      const flag = visitor.getFlag(flagKey);
-      const value = flag.getValue(defaultValue);
-      const meta = flag.metadata;
-
-      return { value, meta };
+async function getFlagValue(fsVisitor, flagKey, defaultValue = null) {
+    const flag = fsVisitor.getFlag(flagKey);
+    return flag.getValue(defaultValue);
 }
 
-const visitor = Flagship.newVisitor({
-    visitorId: "100000",
-    context: {}, // Ajoute ici tes clés de contexte si besoin
-    consent: true // correspond à "visitor_consent": true
-});
-
-// Appel à la Decision API pour récupérer les flags du visiteur
-visitor.fetchFlags().then(() => {
-    // Récupération de la valeur du flag "has_access_results_atchoum"
-    const myFlag = visitor.getFlag("has_access_results_atchoum");
-    const flagValue = myFlag.getValue();
-    console.log("Valeur du flag has_access_results_atchoum :", flagValue);
-
-    // Si tu veux parcourir tous les flags :
-    /*const allFlags = visitor.getAllFlagsData();
-    console.log("Tous les flags :", allFlags);*/
-});
 
 router.get('/healthz', (req, res, next) => {
     return res.status(200).send('OK')
@@ -177,30 +153,19 @@ router.post('/see_results', async (req, res, next) => {
         const { id } = req.body;
         console.log('id', id)
         const FLAG_KEY = 'has_access_results_atchoum';
-        const { value } = await decideFlag({
-          visitorId: String(id),
-          flagKey: FLAG_KEY,
-          defaultValue: false,
-        });
+        const visitor = await Flagship.newVisitor(
+            {
+                visitorId: String(id),
+                context: {},
+                hasConsented: true
+            }
+        );
+
+        await visitor.fetchFlags();
+
+        const value = await getFlagValue(visitor, FLAG_KEY, { has_access_results_atchoum: false });
 
         return res.status(200).send({ [FLAG_KEY]: Boolean(value) });
-        /*const decisionAPI = await axios.post('https://decision.flagship.io/v2/ci84rm4uf6t1jrrefeig/campaigns', {
-            visitor_id: id.toString(),
-            context: {},
-            visitor_consent: true,
-            trigger_hit: true,
-            decision_group: null
-        }, {
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': 'HplFmExQUmlCmSYVSXDWCtfgimmBJeqCfBwOvfCp'
-            }
-        });
-        if (!decisionAPI.data.campaigns.length) {
-            return res.status(200).send({has_access_results_atchoum:false})
-        }
-        const flagWithValue = decisionAPI.data.campaigns[0].variation.modifications.value;
-        return res.status(200).send(flagWithValue);*/
     } catch (e) {
         console.log('e', e);
         return res.status(400).send(e)
@@ -241,112 +206,130 @@ router.get('/products_contentfull', async (req, res, next) => {
         });
     }
 
-    async function getVariationIdForCampaign(visitorId, targetCampaignId) {
-         const response = await axios.post(
-                'https://decision.flagship.io/v2/ci84rm4uf6t1jrrefeig/campaigns',
-                {
-                    visitor_id: visitorId,
-                    context: {},
-                    visitor_consent: true,
-                    trigger_hit: true,
-                    decision_group: null
-                },
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-api-key': 'HplFmExQUmlCmSYVSXDWCtfgimmBJeqCfBwOvfCp'
-                    }
-                }
-            );
+    function resolveEntryFromContainer(container, includes, variationIdFlagship) {
+        const meta = container.fields.meta;
+        if (!meta) throw new Error('Container meta manquant.');
+        const variationContentfulId = meta?.[variationIdFlagship];
+        if (!variationContentfulId) {
+            throw new Error(`Pas de correspondance meta pour variationId=${variationIdFlagship}`);
+        }
 
-            const campaigns = response.data.campaigns;
+        const entry = includes.Entry?.find(e => e.sys.id === variationContentfulId);
+        if (!entry) throw new Error(`Entry introuvable pour id=${variationContentfulId}`);
 
-            const campaign = campaigns.find(c => c.id === targetCampaignId);
+        const assetId = entry.fields.img?.sys?.id;
+        const asset = includes.Asset?.find(a => a.sys.id === assetId);
+        const imageUrl = asset?.fields?.file?.url ? `https:${asset.fields.file.url}` : null;
 
-            if (!campaign) {
-               return false;
-            }
-
-            const variationId = campaign.variation.id;
-
-            return variationId;
+        return {
+            id: entry.sys.id,
+            name: entry.fields.name,
+            brand: entry.fields.brand,
+            size: entry.fields.size,
+            color: entry.fields.color,
+            imageUrl
+        };
     }
 
-    async function getContentFromFlagshipVariation(variationIdFlagship) {
-            // Appel Contentful pour le container
-            const contentfulResponse = await axios.get(
-                'https://cdn.contentful.com/spaces/st53zti66d9u/environments/master/entries',
-                {
-                    params: {
-                        content_type: 'variationContainer',
-                        access_token: 'POgvWhYCAz-KkV9SLtzZK9W6ge3KKw7Lcxl7vQt11Lc',
-                        'fields.experimentKey': 'products_page'
-                    }
-                }
-            );
-            if (!contentfulResponse.data) {
-                throw new Error('no data find in variation container')
-            }
-            const items = contentfulResponse.data.items;
-            const includes = contentfulResponse.data.includes;
+    async function getVariationForCampaign(visitor, campaignId) {
+        if (!campaignId) {
+            throw new Error('getVariationForCampaign: campaignId requis');
+        }
 
-            if (!items.length) {
-                throw new Error('Aucun container trouvé.');
-            }
+        // fetch the flags
+        await visitor.fetchFlags();
 
-            const container = items[0];
-            const meta = container.fields.meta;
+        // get the metadatas from the visitor
+        const flags = await visitor.getFlags();
+        const metaMap = await flags.getMetadata(); // Map
+        if (!metaMap || typeof metaMap[Symbol.iterator] !== 'function') {
+            throw new Error('getVariationForCampaign: Map de métadatas vide');
+        }
 
-            // Cherche l'ID de la variation Contentful correspondant à l’ID Flagship
-            const variationContentfulId = meta[variationIdFlagship];
-            if (!variationContentfulId) {
-                throw new Error(`Aucune correspondance trouvée dans le meta pour l’ID Flagship ${variationIdFlagship}`);
-            }
+        // Map the map to retrieve the right camapigId and variationId
+        for (const [flagKey, meta] of metaMap.entries()) {
+            if (!meta) continue;
+            if (meta.campaignId !== campaignId) continue;
 
-            // Trouve l'entrée Contentful (pull ou tshirt)
-            const entry = includes.Entry.find(e => e.sys.id === variationContentfulId);
-            if (!entry) {
-                throw new Error(`Aucune entrée trouvée pour l’ID Contentful ${variationContentfulId}`);
-            }
-
-            // Récupération de l'image associée
-            const assetId = entry.fields.img.sys.id;
-            const asset = includes.Asset.find(a => a.sys.id === assetId);
-            const imageUrl = asset?.fields?.file?.url
-                ? `https:${asset.fields.file.url}`
-                : null;
-
-            // Formatage final
-            const formatted = {
-                name: entry.fields.name,
-                brand: entry.fields.brand,
-                size: entry.fields.size,
-                color: entry.fields.color,
-                imageUrl
+            return {
+                variationId: meta.variationId,
+                flagKeyMatched: flagKey,
+                metadata: meta,
             };
-            console.log('formatted', formatted)
+        }
 
-            return formatted;
+        throw new Error(`getVariationForCampaign: aucune metadata pour campaignId=${campaignId}`);
     }
 
+    function getVariationIdFromMetadata(campaignId, metadatas) {
+        if (!campaignId || !Array.isArray(metadatas)) {
+            return null;
+        }
+
+        for (const [key, metadata] of metadatas) {
+            if (metadata && metadata.campaignId === campaignId) {
+                return metadata.variationId;
+            }
+        }
+
+        return null;
+    }
 
     try {
-        const visitorId = Date.now() + '-' + Math.floor(Math.random() * 10000);
-        const idOrigninal = 'd1ilgv373e5iv8esho90';
-        const varationFS = await getVariationIdForCampaign(visitorId, "d1ilgv373e5iv8esho80");
-        if (!varationFS || (varationFS === idOrigninal)) {
-            const urlContentFull = 'https://cdn.contentful.com/spaces/st53zti66d9u/environments/master/entries?access_token=POgvWhYCAz-KkV9SLtzZK9W6ge3KKw7Lcxl7vQt11Lc';
-            const response = await axios.get(urlContentFull)
-            const formattedRes = parseDataFromContentful(response.data);
-            return res.send(formattedRes.filter((res) => res.name))
+
+        // const visitorId = Date.now() + '-' + Math.floor(Math.random() * 10000);
+        const visitorId = 3
+
+        // initialize Contentful SDK
+        const client = contentful.createClient({
+            space: process.env.CTF_SPACE_ID || 'st53zti66d9u',
+            accessToken: process.env.CTF_CDA_TOKEN || 'POgvWhYCAz-KkV9SLtzZK9W6ge3KKw7Lcxl7vQt11Lc',
+        });
+
+        // retrieve the container entry with content type id
+        const containerResp = await client.getEntries({
+            content_type: 'abTastyContainer',
+            limit: 1,
+            include: 2,
+        });
+
+        if (!containerResp.items?.length) {
+            throw new Error('No abTastyContainer found in Contentful.');
         }
-        const formattedRes = await getContentFromFlagshipVariation(varationFS);
-        return res.send([formattedRes])
+
+        // get the first item from the container
+        const container = containerResp.items[0];
+
+
+        const campaignId = container.fields.experimentID;
+
+        // get the includes from the response
+        const includes = containerResp.includes || {};
+
+        // 2) create a new visitor with the visitorId
+        const visitor = await Flagship.newVisitor({
+            visitorId: String(visitorId),
+            context: {},
+            hasConsented: true
+        });
+
+        const { variationId } = await getVariationForCampaign(visitor, campaignId);
+
+        // 3) Si pas de variation, retourner une liste de fallback depuis Contentful (SDK)
+        if (!variationId) {
+            const listResp = await client.getEntries({ include: 2, limit: 50 });
+            const simplified = parseDataFromContentful(listResp).filter(e => e.name);
+            return res.status(200).send(simplified);
+        }
+
+        // 4) S'il y a une variation, résoudre l'entry ciblée par le container
+        const formattedRes = resolveEntryFromContainer(container, includes, variationId);
+        return res.status(200).send([formattedRes]);
 
     } catch (e) {
         return res.status(500).send({
             message: 'Error at get contentfull',
-            error: e.message, // ou juste e si tu veux tout
+            error: e.message,
         });
     }
 })
