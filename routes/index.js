@@ -277,8 +277,7 @@ router.get('/products_contentfull', async (req, res, next) => {
 
     try {
 
-        // const visitorId = Date.now() + '-' + Math.floor(Math.random() * 10000);
-        const visitorId = 3
+        const visitorId = Date.now() + '-' + Math.floor(Math.random() * 10000);
 
         // initialize Contentful SDK
         const client = contentful.createClient({
