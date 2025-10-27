@@ -282,7 +282,7 @@ router.get('/products_contentfull', async (req, res, next) => {
         // initialize Contentful SDK
         const client = contentful.createClient({
             space: process.env.CTF_SPACE_ID || 'st53zti66d9u',
-            accessToken: process.env.CTF_CDA_TOKEN || 'POgvWhYCAz-KkV9SLtzZK9W6ge3KKw7Lcxl7vQt11Lc',
+            accessToken: process.env.CTF_CDA_TOKEN || 'GzK1jEf9DTPXWxRj-hQfK6QzwNrncuZEcysvnHUPoa8',
         });
 
         // retrieve the container entry with content type id
