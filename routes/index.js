@@ -281,7 +281,7 @@ router.get('/products_contentfull', async (req, res, next) => {
 
         // initialize Contentful SDK
         const client = contentful.createClient({
-            space: process.env.CTF_SPACE_ID || 'st53zti66d9u',
+            space: process.env.CTF_SPACE_ID || 'ntm4yevtnhlx',
             accessToken: process.env.CTF_CDA_TOKEN || 'GzK1jEf9DTPXWxRj-hQfK6QzwNrncuZEcysvnHUPoa8',
         });
 
