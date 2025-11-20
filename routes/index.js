@@ -261,7 +261,7 @@ router.get('/products_contentfull', async (req, res, next) => {
         throw new Error(`getVariationForCampaign: aucune metadata pour campaignId=${campaignId}`);
     }
 
-    function getVariationIdFromMetadata(campaignId, metadatas) {
+/*    function getVariationIdFromMetadata(campaignId, metadatas) {
         if (!campaignId || !Array.isArray(metadatas)) {
             return null;
         }
@@ -273,7 +273,7 @@ router.get('/products_contentfull', async (req, res, next) => {
         }
 
         return null;
-    }
+    }*/
 
     try {
 
@@ -281,8 +281,8 @@ router.get('/products_contentfull', async (req, res, next) => {
 
         // initialize Contentful SDK
         const client = contentful.createClient({
-            space: process.env.CTF_SPACE_ID || 'ntm4yevtnhlx',
-            accessToken: process.env.CTF_CDA_TOKEN || 'GzK1jEf9DTPXWxRj-hQfK6QzwNrncuZEcysvnHUPoa8',
+            space: process.env.CTF_SPACE_ID || 'nzg8kjsg18bg',
+            accessToken: process.env.CTF_CDA_TOKEN || 'sMoIs5SnZzxseK0GBpA5jnAmApKW4Yoq__c_DxFK584',
         });
 
         // retrieve the container entry with content type id
