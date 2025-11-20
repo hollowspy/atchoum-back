@@ -178,6 +178,7 @@ router.get('/findResult', findResult)
 
 
 router.get('/products_contentfull', async (req, res, next) => {
+    console.log('in product contentfull')
      const parseDataFromContentful = (response) => {
         const assetMap = new Map();
 
@@ -217,17 +218,13 @@ router.get('/products_contentfull', async (req, res, next) => {
         const entry = includes.Entry?.find(e => e.sys.id === variationContentfulId);
         if (!entry) throw new Error(`Entry introuvable pour id=${variationContentfulId}`);
 
-        const assetId = entry.fields.img?.sys?.id;
-        const asset = includes.Asset?.find(a => a.sys.id === assetId);
-        const imageUrl = asset?.fields?.file?.url ? `https:${asset.fields.file.url}` : null;
-
         return {
             id: entry.sys.id,
             name: entry.fields.name,
             brand: entry.fields.brand,
             size: entry.fields.size,
             color: entry.fields.color,
-            imageUrl
+            imageUrl: entry?.fields?.imageUrl ? entry?.fields?.imageUrl : null
         };
     }
 
@@ -284,6 +281,7 @@ router.get('/products_contentfull', async (req, res, next) => {
             space: process.env.CTF_SPACE_ID || 'nzg8kjsg18bg',
             accessToken: process.env.CTF_CDA_TOKEN || 'sMoIs5SnZzxseK0GBpA5jnAmApKW4Yoq__c_DxFK584',
         });
+        console.log('client', client)
 
         // retrieve the container entry with content type id
         const containerResp = await client.getEntries({
@@ -291,6 +289,7 @@ router.get('/products_contentfull', async (req, res, next) => {
             limit: 1,
             include: 2,
         });
+        console.log('containerResp', containerResp)
 
         if (!containerResp.items?.length) {
             throw new Error('No abTastyContainer found in Contentful.');
